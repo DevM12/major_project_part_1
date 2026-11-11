@@ -1,0 +1,63 @@
+<!doctype html>
+<html>
+<head>
+  <title>Zero Trust Security Dashboard</title>
+  <style>
+    body{font-family:Arial;margin:0;background:#101827;color:#fff;padding:25px}
+    h1{margin-top:0}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+    .card{background:#1b2638;padding:18px;border-radius:10px}.num{font-size:28px;font-weight:bold}
+    table{width:100%;margin-top:20px;border-collapse:collapse;background:#1b2638}
+    th,td{padding:10px;border-bottom:1px solid #334155;text-align:left;font-size:13px}
+    .grant{color:#4ade80}.monitor{color:#facc15}.step_up{color:#fb923c}.deny{color:#f87171}
+    button{padding:10px 15px;border:0;border-radius:7px;cursor:pointer;margin-right:8px}
+    #status{display:inline-block;margin-left:8px;color:#94a3b8}
+  </style>
+</head>
+<body>
+<h1>Integrated Zero Trust Security</h1>
+<p>Risk + Z-score anomaly detection + Zero Trust policy</p>
+<div class="cards">
+  <div class="card">Total Events<div id="total" class="num">0</div></div>
+  <div class="card">Grant<div id="grant" class="num">0</div></div>
+  <div class="card">Monitor<div id="monitor" class="num">0</div></div>
+  <div class="card">Deny / Step-up<div id="danger" class="num">0</div></div>
+</div>
+<br><button onclick="startRandomCalls()">Start Random Calls</button><button onclick="stopRandomCalls()">Stop</button><button onclick="load()">Refresh</button><span id="status">Stopped</span>
+<table><thead><tr><th>User</th><th>Resource</th><th>Risk</th><th>Z-score</th><th>Anomaly</th><th>Decision</th><th>Reason</th></tr></thead>
+<tbody id="rows"></tbody></table>
+<script>
+let timer=null;
+
+async function load(){
+  const m=await fetch('/api/metrics').then(r=>r.json());
+  document.getElementById('total').textContent=m.total;
+  document.getElementById('grant').textContent=m.decisions.grant||0;
+  document.getElementById('monitor').textContent=m.decisions.monitor||0;
+  document.getElementById('danger').textContent=(m.decisions.deny||0)+(m.decisions.step_up||0);
+  const e=await fetch('/api/events').then(r=>r.json());
+  document.getElementById('rows').innerHTML=e.map(x=>`<tr>
+    <td>${x.user_name} (${x.user_id})</td><td>${x.resource_id}</td>
+    <td>${x.risk_score} (${x.risk_level})</td><td>${x.z_score}</td>
+    <td>${x.anomaly?'YES':'NO'}</td><td class="${x.decision}">${x.decision}</td><td>${x.reason}</td>
+  </tr>`).join('');
+}
+async function randomCall(){
+  await fetch('/api/random-event', {method:'POST'});
+  await load();
+}
+
+function startRandomCalls(){
+  if(timer) return;
+  randomCall();
+  timer=setInterval(randomCall, 2000);
+  document.getElementById('status').textContent='Running: 1 random call every 2 seconds';
+}
+
+function stopRandomCalls(){
+  if(timer){clearInterval(timer); timer=null;}
+  document.getElementById('status').textContent='Stopped';
+}
+
+load();
+</script>
+</body></html>
